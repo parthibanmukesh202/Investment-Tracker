@@ -5,7 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # ---------------- APP CONFIG ----------------
-st.set_page_config(page_title="Investment Tracker", layout="wide")
+st.set_page_config(page_title="Investment Dashboard", layout="wide")
 
 # ---------------- STYLE ----------------
 st.markdown("""
@@ -24,18 +24,31 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("💰 Personal Investment Dashboard")
-st.markdown("<p class='creator'>📊 Created by <b>Mukesh Parthiban</b></p>", unsafe_allow_html=True)
-st.divider()
+# ---------------- LOGIN ----------------
+st.sidebar.title("🔐 Login")
+username = st.sidebar.text_input("Enter Username")
 
-# ---------------- SESSION DATA ----------------
-if "df" not in st.session_state:
-    st.session_state.df = pd.DataFrame(columns=["Date", "Cashflow"])
+if not username:
+    st.title("🔒 Investment Dashboard")
+    st.info("Please enter your **Username** in sidebar to continue.")
+    st.stop()
+
+# ---------------- SESSION STORAGE ----------------
+if "users" not in st.session_state:
+    st.session_state.users = {}
+
+if username not in st.session_state.users:
+    st.session_state.users[username] = pd.DataFrame(columns=["Date", "Cashflow"])
+
+df_user = st.session_state.users[username]
+
+# ---------------- HEADER ----------------
+st.title("💰 Personal Investment Dashboard")
+st.markdown(f"<p class='creator'>👤 User: <b>{username}</b> | Created by <b>Mukesh Parthiban</b></p>", unsafe_allow_html=True)
+st.divider()
 
 # ---------------- XIRR FUNCTION ----------------
 def calculate_xirr(cashflows, dates):
-    if len(cashflows) < 2:
-        return 0.0
     try:
         years = [(d - dates[0]).days / 365 for d in dates]
         rate = 0.1
@@ -55,27 +68,27 @@ with left:
     st.subheader("🗓️ Cashflow Entry")
 
     with st.expander("➕ Add Cashflow", expanded=True):
-        d = st.date_input("Select Date")
+        d = st.date_input("Date", value=date.today())
         amt = st.number_input("Cashflow ( - Invest | + Withdraw )", step=500.0)
-        if st.button("Add"):
-            st.session_state.df = pd.concat(
-                [st.session_state.df, pd.DataFrame({"Date":[d], "Cashflow":[amt]})],
-                ignore_index=True
-            )
+        if st.button("Add Cashflow"):
+            new_row = pd.DataFrame({"Date": [d], "Cashflow": [amt]})
+            df_user = pd.concat([df_user, new_row], ignore_index=True)
+            st.session_state.users[username] = df_user
+            st.success("Cashflow Added")
             st.rerun()
 
     st.subheader("📒 Cashflow Table")
-    st.session_state.df = st.data_editor(
-        st.session_state.df,
-        num_rows="dynamic",
-        use_container_width=True
-    )
+    df_user = st.data_editor(df_user, num_rows="dynamic", use_container_width=True)
+
+    if st.button("💾 SAVE DATA"):
+        st.session_state.users[username] = df_user
+        st.success("Data Saved for this Session ✅")
 
 # ================= RIGHT =================
 with right:
     st.subheader("📊 Investment Summary")
 
-    df = st.session_state.df.dropna()
+    df = df_user.dropna()
     if not df.empty:
         df["Date"] = pd.to_datetime(df["Date"])
         df = df.sort_values("Date")
@@ -85,11 +98,8 @@ with right:
         net_value = invested + df["Cashflow"].sum()
         profit = net_value - invested
 
-        # CAGR
         years = (df["Date"].max() - df["Date"].min()).days / 365
         cagr = (net_value / invested) ** (1 / years) - 1 if invested > 0 and years > 0 else 0
-
-        # XIRR
         xirr = calculate_xirr(df["Cashflow"].tolist(), df["Date"].tolist())
 
         m1, m2 = st.columns(2)
@@ -101,19 +111,17 @@ with right:
         m4.metric("📊 CAGR", f"{cagr:.2%}")
         m5.metric("🎯 XIRR", f"{xirr:.2%}")
 
-        # ---- PIE CHART ----
+        # PIE
         st.subheader("🥧 Investment vs Withdrawal")
         fig1, ax1 = plt.subplots()
-        ax1.pie(
-            [invested, max(1, withdrawn)],
-            labels=["Investment", "Withdrawal"],
-            autopct="%1.1f%%",
-            startangle=90
-        )
+        ax1.pie([invested, max(1, withdrawn)],
+                labels=["Investment", "Withdrawal"],
+                autopct="%1.1f%%",
+                startangle=90)
         ax1.axis("equal")
         st.pyplot(fig1)
 
-        # ---- CASHFLOW LINE ----
+        # CASHFLOW LINE
         st.subheader("📉 Cashflow Timeline")
         st.line_chart(df.set_index("Date")["Cashflow"])
 
@@ -121,37 +129,37 @@ with right:
 st.divider()
 st.subheader("🚀 SIP / Lumpsum Calculator")
 
-mode = st.radio("Select Mode", ["📅 SIP", "🏦 Lumpsum"], horizontal=True)
+mode = st.radio("Mode", ["📅 SIP", "🏦 Lumpsum"], horizontal=True)
 
 c1, c2, c3 = st.columns(3)
 
 if mode == "📅 SIP":
-    sip = c1.number_input("Monthly SIP (₹)", value=10000)
-    rate = c2.number_input("Expected Return %", value=12.0)
+    sip = c1.number_input("Monthly SIP ₹", value=10000)
+    rate = c2.number_input("Return %", value=12.0)
     years = c3.number_input("Years", value=15)
 
     m_rate = rate / 12 / 100
     months = years * 12
-    invested = sip * months
+    invested_sip = sip * months
 
     values = []
     corpus = 0
-    for m in range(months):
+    for _ in range(months):
         corpus = (corpus + sip) * (1 + m_rate)
         values.append(corpus)
 
 else:
-    lump = c1.number_input("Lumpsum (₹)", value=100000)
-    rate = c2.number_input("Expected Return %", value=12.0)
+    lump = c1.number_input("Lumpsum ₹", value=100000)
+    rate = c2.number_input("Return %", value=12.0)
     years = c3.number_input("Years", value=15)
 
-    invested = lump
+    invested_sip = lump
     values = [lump * (1 + rate/100) ** y for y in range(1, years + 1)]
     corpus = values[-1]
 
 o1, o2, o3 = st.columns(3)
-o1.metric("💸 Invested", f"₹ {invested:,.0f}")
-o2.metric("📈 Returns", f"₹ {corpus - invested:,.0f}")
+o1.metric("💸 Invested", f"₹ {invested_sip:,.0f}")
+o2.metric("📈 Returns", f"₹ {corpus - invested_sip:,.0f}")
 o3.metric("🏦 Final Value", f"₹ {corpus:,.0f}")
 
 st.subheader("📈 Growth Chart")
