@@ -44,7 +44,10 @@ df_user = st.session_state.users[username]
 
 # ---------------- HEADER ----------------
 st.title("💰 Personal Investment Dashboard")
-st.markdown(f"<p class='creator'>👤 User: <b>{username}</b> | Created by <b>Mukesh Parthiban</b></p>", unsafe_allow_html=True)
+st.markdown(
+    f"<p class='creator'>👤 User: <b>{username}</b> | Created by <b>Mukesh Parthiban</b></p>",
+    unsafe_allow_html=True
+)
 st.divider()
 
 # ---------------- XIRR FUNCTION ----------------
@@ -94,9 +97,10 @@ with right:
         df = df.sort_values("Date")
 
         invested = abs(df[df["Cashflow"] < 0]["Cashflow"].sum())
-        withdrawn = df[df["Cashflow"] > 0]["Cashflow"].sum()
         net_value = invested + df["Cashflow"].sum()
         profit = net_value - invested
+
+        absolute_return = (profit / invested) * 100 if invested > 0 else 0
 
         years = (df["Date"].max() - df["Date"].min()).days / 365
         cagr = (net_value / invested) ** (1 / years) - 1 if invested > 0 and years > 0 else 0
@@ -106,25 +110,23 @@ with right:
         m1.metric("💸 Invested", f"₹ {invested:,.0f}")
         m2.metric("💰 Net Value", f"₹ {net_value:,.0f}")
 
-        m3, m4, m5 = st.columns(3)
+        m3, m4, m5, m6 = st.columns(4)
         m3.metric("📈 Profit", f"₹ {profit:,.0f}")
         m4.metric("📊 CAGR", f"{cagr*100:.2f}%")
         m5.metric("🎯 XIRR", f"{xirr*100:.2f}%")
+        m6.metric("📌 Absolute Return", f"{absolute_return:.2f}%")
 
-
-        # PIE
-        st.subheader("🥧 Investment vs Withdrawal")
+        # PIE: Investment vs Profit
+        st.subheader("🥧 Investment vs Profit")
         fig1, ax1 = plt.subplots()
-        ax1.pie([invested, max(1, withdrawn)],
-                labels=["Investment", "Withdrawal"],
-                autopct="%1.1f%%",
-                startangle=90)
+        ax1.pie(
+            [invested, max(1, profit)],
+            labels=["Investment", "Profit"],
+            autopct="%1.1f%%",
+            startangle=90
+        )
         ax1.axis("equal")
         st.pyplot(fig1)
-
-        # CASHFLOW LINE
-        st.subheader("📉 Cashflow Timeline")
-        st.line_chart(df.set_index("Date")["Cashflow"])
 
 # ================= SIP / LUMPSUM =================
 st.divider()
@@ -165,6 +167,4 @@ o3.metric("🏦 Final Value", f"₹ {corpus:,.0f}")
 
 st.subheader("📈 Growth Chart")
 st.line_chart(values)
-
-
 
