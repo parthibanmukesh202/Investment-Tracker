@@ -1,23 +1,52 @@
 import streamlit as st
-import gspread
-from google.oauth2.service_account import Credentials
+import pandas as pd
+from datetime import date
+from streamlit_gsheets import GSheetsConnection
 
-scope = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/spreadsheets",
-    "https://www.googleapis.com/auth/drive"
-]
+st.set_page_config(page_title="Investment Tracker", layout="wide")
 
-creds = Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"],
-    scopes=scope
+# --- LOGIN ---
+st.sidebar.title("🔐 Login")
+username = st.sidebar.text_input("Username")
+password = st.sidebar.text_input("Password", type="password")
+
+if not (username and password == "invest123"):
+    st.info("Login using password: invest123")
+    st.stop()
+
+# --- CONNECT SHEET ---
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+try:
+    data = conn.read()
+except:
+    data = pd.DataFrame(columns=["User", "Date", "Cashflow"])
+
+user_df = data[data["User"] == username]
+
+if user_df.empty:
+    user_df = pd.DataFrame({
+        "User": [username],
+        "Date": [date.today()],
+        "Cashflow": [0.0]
+    })
+
+st.title("💰 Investment Dashboard")
+st.write(f"Welcome **{username}**")
+
+# --- EDITOR ---
+edited = st.data_editor(
+    user_df[["Date", "Cashflow"]],
+    num_rows="dynamic",
+    use_container_width=True
 )
 
-client = gspread.authorize(creds)
+# --- AUTO SAVE ---
+other_users = data[data["User"] != username]
+edited["User"] = username
+final_df = pd.concat([other_users, edited], ignore_index=True)
 
-# OPEN SPREADSHEET (name must match exactly)
-sheet = client.open("InvestmentData").worksheet("cashflow")
+conn.update(data=final_df)
 
-data = sheet.get_all_records()
-st.write(data)
+st.success("✅ Auto-saved to Google Sheets")
 
