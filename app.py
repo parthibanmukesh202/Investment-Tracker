@@ -116,11 +116,11 @@ with right:
         m5.metric("🎯 XIRR", f"{xirr*100:.2f}%")
         m6.metric("📌 Absolute Return", f"{absolute_return:.2f}%")
 
-        # PIE → BASED ON NET VALUE
-        st.subheader("🥧 Investment vs Profit (Net Value Based)")
+        # PIE: Investment vs Profit
+        st.subheader("🥧 Investment vs Profit")
         fig1, ax1 = plt.subplots()
         ax1.pie(
-            [invested, profit],
+            [invested, max(1, profit)],
             labels=["Investment", "Profit"],
             autopct="%1.1f%%",
             startangle=90
@@ -167,4 +167,5 @@ o3.metric("🏦 Final Value", f"₹ {corpus:,.0f}")
 
 st.subheader("📈 Growth Chart")
 st.line_chart(values)
+
 
