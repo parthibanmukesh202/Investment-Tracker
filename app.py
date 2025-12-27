@@ -108,8 +108,8 @@ with right:
 
         m3, m4, m5 = st.columns(3)
         m3.metric("📈 Profit", f"₹ {profit:,.0f}")
-m4.metric("📊 CAGR", f"{cagr*100:.2f}%")
-m5.metric("🎯 XIRR", f"{xirr*100:.2f}%")
+        m4.metric("📊 CAGR", f"{cagr*100:.2f}%")
+        m5.metric("🎯 XIRR", f"{xirr*100:.2f}%")
 
 
         # PIE
@@ -165,5 +165,6 @@ o3.metric("🏦 Final Value", f"₹ {corpus:,.0f}")
 
 st.subheader("📈 Growth Chart")
 st.line_chart(values)
+
 
 
