@@ -3,9 +3,13 @@ import pandas as pd
 from datetime import date
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 # ---------------- APP CONFIG ----------------
 st.set_page_config(page_title="Investment Dashboard", layout="wide")
+
+DATA_DIR = "user_data"
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---------------- STYLE ----------------
 st.markdown("""
@@ -40,16 +44,14 @@ if not username:
     st.info("Please enter your **Username** in sidebar to continue.")
     st.stop()
 
-# ---------------- SESSION STORAGE ----------------
-if "users" not in st.session_state:
-    st.session_state.users = {}
+user_file = f"{DATA_DIR}/{username}.csv"
 
-if username not in st.session_state.users:
-    st.session_state.users[username] = pd.DataFrame(
-        columns=["Date", "Cashflow"]
-    )
-
-df_user = st.session_state.users[username]
+# ---------------- LOAD DATA ----------------
+if os.path.exists(user_file):
+    df_user = pd.read_csv(user_file)
+    df_user["Date"] = pd.to_datetime(df_user["Date"])
+else:
+    df_user = pd.DataFrame(columns=["Date", "Cashflow"])
 
 # ---------------- HEADER ----------------
 st.title("💰 Personal Investment Dashboard")
@@ -81,31 +83,24 @@ with left:
 
     with st.expander("➕ Add Cashflow", expanded=True):
         d = st.date_input("Date", value=date.today())
-        amt = st.number_input(
-            "Cashflow ( - Invest | + Withdraw )",
-            step=500.0
-        )
+        amt = st.number_input("Cashflow ( - Invest | + Withdraw )", step=500.0)
 
         if st.button("Add Cashflow"):
             new_row = pd.DataFrame({
-                "Date": [pd.to_datetime(d)],   # 🔴 IMPORTANT FIX
+                "Date": [pd.to_datetime(d)],
                 "Cashflow": [amt]
             })
             df_user = pd.concat([df_user, new_row], ignore_index=True)
-            st.session_state.users[username] = df_user
-            st.success("Cashflow Added ✅")
+            df_user.to_csv(user_file, index=False)
+            st.success("Cashflow Added & Saved ✅")
             st.rerun()
 
     st.subheader("📒 Cashflow Table")
-    df_user = st.data_editor(
-        df_user,
-        num_rows="dynamic",
-        use_container_width=True
-    )
+    df_user = st.data_editor(df_user, num_rows="dynamic", use_container_width=True)
 
     if st.button("💾 SAVE DATA"):
-        st.session_state.users[username] = df_user
-        st.success("Data Saved for this Session ✅")
+        df_user.to_csv(user_file, index=False)
+        st.success("Data Permanently Saved ✅")
 
 # ================= RIGHT =================
 with right:
@@ -114,7 +109,6 @@ with right:
     df = df_user.dropna()
 
     if not df.empty:
-        # 🔴 IMPORTANT FIX
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
         df = df.dropna(subset=["Date"])
         df = df.sort_values("Date")
@@ -139,7 +133,6 @@ with right:
         m5.metric("🎯 XIRR", f"{xirr*100:.2f}%")
         m6.metric("📌 Absolute Return", f"{absolute_return:.2f}%")
 
-        # PIE: Investment vs Profit (Net based)
         st.subheader("🥧 Investment vs Profit")
         fig1, ax1 = plt.subplots()
         ax1.pie(
@@ -156,7 +149,6 @@ st.divider()
 st.subheader("🚀 SIP / Lumpsum Calculator")
 
 mode = st.radio("Mode", ["📅 SIP", "🏦 Lumpsum"], horizontal=True)
-
 c1, c2, c3 = st.columns(3)
 
 if mode == "📅 SIP":
@@ -173,7 +165,6 @@ if mode == "📅 SIP":
     for _ in range(months):
         corpus = (corpus + sip) * (1 + m_rate)
         values.append(corpus)
-
 else:
     lump = c1.number_input("Lumpsum ₹", value=100000)
     rate = c2.number_input("Return %", value=12.0)
