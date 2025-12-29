@@ -97,7 +97,7 @@ with right:
 
     df = df_user.dropna()
     if not df.empty:
-        df["Date"] = pd.to_datetime(df["Date"])
+        df_user["Date"] = pd.to_datetime(df_user["Date"], errors="coerce")
         df = df.sort_values("Date")
 
         invested = abs(df[df["Cashflow"] < 0]["Cashflow"].sum())
@@ -169,3 +169,4 @@ o3.metric("🏦 Final Value", f"₹ {corpus:,.0f}")
 
 st.subheader("📈 Growth Chart")
 st.line_chart(values)
+
