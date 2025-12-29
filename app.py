@@ -3,20 +3,23 @@ import pandas as pd
 from datetime import date
 import numpy as np
 import matplotlib.pyplot as plt
-import os
 
 # ---------------- APP CONFIG ----------------
 st.set_page_config(page_title="Investment Dashboard", layout="wide")
-
-DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---------------- STYLE ----------------
 st.markdown("""
 <style>
 .main { background-color: #f4f7f6; }
-[data-testid="stMetricValue"] { color: #2e7d32; font-size: 1.7rem; font-weight: 700; }
-[data-testid="stMetricLabel"] { font-size: 0.95rem; color: #444; }
+[data-testid="stMetricValue"] {
+    color: #2e7d32;
+    font-size: 1.7rem;
+    font-weight: 700;
+}
+[data-testid="stMetricLabel"] {
+    font-size: 0.95rem;
+    color: #444;
+}
 .stButton>button {
     background-color: #2e7d32;
     color: white;
@@ -37,14 +40,16 @@ if not username:
     st.info("Please enter your **Username** in sidebar to continue.")
     st.stop()
 
-USER_FILE = f"{DATA_DIR}/{username}.csv"
+# ---------------- SESSION STORAGE ----------------
+if "users" not in st.session_state:
+    st.session_state.users = {}
 
-# ---------------- LOAD USER DATA ----------------
-if os.path.exists(USER_FILE):
-    df_user = pd.read_csv(USER_FILE)
-    df_user["Date"] = pd.to_datetime(df_user["Date"])
-else:
-    df_user = pd.DataFrame(columns=["Date", "Cashflow"])
+if username not in st.session_state.users:
+    st.session_state.users[username] = pd.DataFrame(
+        columns=["Date", "Cashflow"]
+    )
+
+df_user = st.session_state.users[username]
 
 # ---------------- HEADER ----------------
 st.title("💰 Personal Investment Dashboard")
@@ -76,33 +81,48 @@ with left:
 
     with st.expander("➕ Add Cashflow", expanded=True):
         d = st.date_input("Date", value=date.today())
-        amt = st.number_input("Cashflow ( - Invest | + Withdraw )", step=500.0)
+        amt = st.number_input(
+            "Cashflow ( - Invest | + Withdraw )",
+            step=500.0
+        )
+
         if st.button("Add Cashflow"):
-            new_row = pd.DataFrame({"Date": [d], "Cashflow": [amt]})
+            new_row = pd.DataFrame({
+                "Date": [pd.to_datetime(d)],   # 🔴 IMPORTANT FIX
+                "Cashflow": [amt]
+            })
             df_user = pd.concat([df_user, new_row], ignore_index=True)
-            df_user.to_csv(USER_FILE, index=False)
-            st.success("Cashflow Saved Permanently ✅")
+            st.session_state.users[username] = df_user
+            st.success("Cashflow Added ✅")
             st.rerun()
 
     st.subheader("📒 Cashflow Table")
-    df_user = st.data_editor(df_user, num_rows="dynamic", use_container_width=True)
+    df_user = st.data_editor(
+        df_user,
+        num_rows="dynamic",
+        use_container_width=True
+    )
 
     if st.button("💾 SAVE DATA"):
-        df_user.to_csv(USER_FILE, index=False)
-        st.success("Data Saved Permanently ✅")
+        st.session_state.users[username] = df_user
+        st.success("Data Saved for this Session ✅")
 
 # ================= RIGHT =================
 with right:
     st.subheader("📊 Investment Summary")
 
     df = df_user.dropna()
+
     if not df.empty:
+        # 🔴 IMPORTANT FIX
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        df = df.dropna(subset=["Date"])
         df = df.sort_values("Date")
 
         invested = abs(df[df["Cashflow"] < 0]["Cashflow"].sum())
         net_value = invested + df["Cashflow"].sum()
         profit = net_value - invested
+
         absolute_return = (profit / invested) * 100 if invested > 0 else 0
 
         years = (df["Date"].max() - df["Date"].min()).days / 365
@@ -119,10 +139,11 @@ with right:
         m5.metric("🎯 XIRR", f"{xirr*100:.2f}%")
         m6.metric("📌 Absolute Return", f"{absolute_return:.2f}%")
 
-        pie_profit = profit if profit > 0 else 0.0001
+        # PIE: Investment vs Profit (Net based)
+        st.subheader("🥧 Investment vs Profit")
         fig1, ax1 = plt.subplots()
         ax1.pie(
-            [invested, pie_profit],
+            [invested, max(1, profit)],
             labels=["Investment", "Profit"],
             autopct="%1.1f%%",
             startangle=90
@@ -159,7 +180,7 @@ else:
     years = c3.number_input("Years", value=15)
 
     invested_sip = lump
-    values = [lump * (1 + rate/100) ** y for y in range(1, years + 1)]
+    values = [(lump * (1 + rate/100) ** y) for y in range(1, years + 1)]
     corpus = values[-1]
 
 o1, o2, o3 = st.columns(3)
@@ -169,5 +190,4 @@ o3.metric("🏦 Final Value", f"₹ {corpus:,.0f}")
 
 st.subheader("📈 Growth Chart")
 st.line_chart(values)
-
 
