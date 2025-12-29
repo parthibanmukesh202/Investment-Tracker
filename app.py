@@ -3,9 +3,13 @@ import pandas as pd
 from datetime import date
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 # ---------------- APP CONFIG ----------------
 st.set_page_config(page_title="Investment Dashboard", layout="wide")
+
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
 
 # ---------------- STYLE ----------------
 st.markdown("""
@@ -33,14 +37,14 @@ if not username:
     st.info("Please enter your **Username** in sidebar to continue.")
     st.stop()
 
-# ---------------- SESSION STORAGE ----------------
-if "users" not in st.session_state:
-    st.session_state.users = {}
+USER_FILE = f"{DATA_DIR}/{username}.csv"
 
-if username not in st.session_state.users:
-    st.session_state.users[username] = pd.DataFrame(columns=["Date", "Cashflow"])
-
-df_user = st.session_state.users[username]
+# ---------------- LOAD USER DATA ----------------
+if os.path.exists(USER_FILE):
+    df_user = pd.read_csv(USER_FILE)
+    df_user["Date"] = pd.to_datetime(df_user["Date"])
+else:
+    df_user = pd.DataFrame(columns=["Date", "Cashflow"])
 
 # ---------------- HEADER ----------------
 st.title("💰 Personal Investment Dashboard")
@@ -76,16 +80,16 @@ with left:
         if st.button("Add Cashflow"):
             new_row = pd.DataFrame({"Date": [d], "Cashflow": [amt]})
             df_user = pd.concat([df_user, new_row], ignore_index=True)
-            st.session_state.users[username] = df_user
-            st.success("Cashflow Added")
+            df_user.to_csv(USER_FILE, index=False)
+            st.success("Cashflow Saved Permanently ✅")
             st.rerun()
 
     st.subheader("📒 Cashflow Table")
     df_user = st.data_editor(df_user, num_rows="dynamic", use_container_width=True)
 
     if st.button("💾 SAVE DATA"):
-        st.session_state.users[username] = df_user
-        st.success("Data Saved for this Session ✅")
+        df_user.to_csv(USER_FILE, index=False)
+        st.success("Data Saved Permanently ✅")
 
 # ================= RIGHT =================
 with right:
@@ -99,7 +103,6 @@ with right:
         invested = abs(df[df["Cashflow"] < 0]["Cashflow"].sum())
         net_value = invested + df["Cashflow"].sum()
         profit = net_value - invested
-
         absolute_return = (profit / invested) * 100 if invested > 0 else 0
 
         years = (df["Date"].max() - df["Date"].min()).days / 365
@@ -116,11 +119,10 @@ with right:
         m5.metric("🎯 XIRR", f"{xirr*100:.2f}%")
         m6.metric("📌 Absolute Return", f"{absolute_return:.2f}%")
 
-        # PIE: Investment vs Profit
-        st.subheader("🥧 Investment vs Profit")
+        pie_profit = profit if profit > 0 else 0.0001
         fig1, ax1 = plt.subplots()
         ax1.pie(
-            [invested, max(1, profit)],
+            [invested, pie_profit],
             labels=["Investment", "Profit"],
             autopct="%1.1f%%",
             startangle=90
@@ -167,5 +169,3 @@ o3.metric("🏦 Final Value", f"₹ {corpus:,.0f}")
 
 st.subheader("📈 Growth Chart")
 st.line_chart(values)
-
-
